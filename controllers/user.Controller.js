@@ -1,9 +1,12 @@
-import asyncFunction from "../utils/asyncHandler";
-import apiError from "../utils/apiError";
-import apiResponse from "../utils/apiResponse";
-import User from "../models/user.model";
+import { User } from "../models/user.model.js";
+import { apiError } from "../utils/apiError.js";
+import { apiResponse } from "../utils/apiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { generateAccessAndRefreshTokens } from "../utils/generateToken.js";
 
-const registerUser = asyncFunction(async (req, res) => {
+const option = { httpOnly: true, secure: true };
+const registerUser = asyncHandler(async (req, res) => {
   const { fullName, email, username, password } = req.body;
 
   if (
@@ -58,4 +61,57 @@ const registerUser = asyncFunction(async (req, res) => {
     .json(new apiResponse(200, user, "User registered Successfully"));
 });
 
-export {registerUser}
+const login = asyncHandler(async (req, res) => {
+  const { userName, email, password } = req.body;
+  if (!(userName || email)) {
+    throw new apiError(400, " username or email is required");
+  }
+  const user = await User.findOne({
+    $or: [{ userName }, { email }],
+  });
+  if (!user) {
+    throw new apiError(404, "user not exist");
+  }
+  const isPasswordValid = await user.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    throw new Error(401, "Invalid user credentials");
+  }
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, option)
+    .cookie("refreshToken", refreshToken, option)
+    .json(
+      new apiResponse(
+        200,
+        { user: loggedInUser, accessToken, refreshToken },
+        " user logged in successfully "
+      )
+    );
+});
+const LogoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $unset: {
+        refreshToken: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+  return res
+    .status(200)
+    .clearCookies("accessToken", option)
+    .clearCookies("refreshToken", option)
+    .json(new apiResponse(200, [], "user logged out "));
+});
+
+export { login, registerUser };

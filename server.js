@@ -1,7 +1,7 @@
-require("dotenv").config();
+import dotenv from "dotenv";
 import ConnectDB from "./DB/index.js";
-import { app } from "./app.js";
-
+import app from "./app.js";
+dotenv.config({ path: "./.env" });
 ConnectDB()
   .then(() => {
     app.listen(process.env.PORT || 8080, () => {
