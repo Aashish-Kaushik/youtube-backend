@@ -1,3 +1,4 @@
+import { v2 as cloudinary } from "cloudinary";
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { apiError } from "../utils/apiError.js";
@@ -204,8 +205,14 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!avatarLocalPath) {
     throw new apiError(400, "avatar file is required");
   }
-  // ToDo remove pervious avatar
 
+  cloudinary.uploader.destroy(
+    req.user.avatar,
+    { resource_type: "auto" },
+    function (error, result) {
+      console.log(result, error);
+    }
+  );
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!avatar.url) {
@@ -235,6 +242,13 @@ const updateUserCoverImages = asyncHandler(async (req, res) => {
   }
 
   // ToDo remove pervious cover image
+  cloudinary.uploader.destroy(
+    req.user.coverImage,
+    { resource_type: "auto" },
+    function (error, result) {
+      console.log(result, error);
+    }
+  );
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (coverImage.url) {
